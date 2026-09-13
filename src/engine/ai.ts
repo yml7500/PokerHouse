@@ -38,11 +38,17 @@ const FOLD_MARGIN: Record<PersonalityId, number> = {
   rock: 0.1,
 }
 
+// Middle ground between the original table (too much checking around:
+// minEdge 0.2/0.18/0.08/0.13, chance 0.22/0.18/0.32/0.35, bluffChance
+// 0.02/0.02/0.08/0.05) and an earlier over-correction that raised chance and
+// potFraction too far and made bots bet/raise "haywire". Frequency is nudged
+// up from the original; sizing is reined in by the Kelly hard cap below
+// rather than by shrinking potFraction.
 const RAISE_PROFILE: Record<PersonalityId, { minEdge: number; chance: number; potFraction: number; bluffChance: number }> = {
-  rock: { minEdge: 0.2, chance: 0.22, potFraction: 0.48, bluffChance: 0.02 },
-  caller: { minEdge: 0.18, chance: 0.18, potFraction: 0.45, bluffChance: 0.02 },
-  aggressor: { minEdge: 0.08, chance: 0.32, potFraction: 0.55, bluffChance: 0.08 },
-  shark: { minEdge: 0.13, chance: 0.35, potFraction: 0.55, bluffChance: 0.05 },
+  rock: { minEdge: 0.17, chance: 0.28, potFraction: 0.46, bluffChance: 0.03 },
+  caller: { minEdge: 0.15, chance: 0.24, potFraction: 0.46, bluffChance: 0.03 },
+  aggressor: { minEdge: 0.06, chance: 0.4, potFraction: 0.55, bluffChance: 0.11 },
+  shark: { minEdge: 0.1, chance: 0.42, potFraction: 0.55, bluffChance: 0.08 },
 }
 
 // Raising after having checked earlier the same street (a true check-raise)

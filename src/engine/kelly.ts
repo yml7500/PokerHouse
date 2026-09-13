@@ -22,10 +22,12 @@ export function netOddsForCall(potBeforeCall: number, callAmount: number): numbe
   return potBeforeCall / callAmount
 }
 
-// Lowered from 0.25 -> tighter hard cap on recommended bankroll exposure so
-// a single decision can't risk a large slice of the stack, keeping bust-outs
-// (human or bot) from happening in just a handful of hands.
-const MAX_BANKROLL_FRACTION = 0.12
+// Lowered from 0.25 -> 0.12 -> 0.08: tighter hard cap on recommended bankroll
+// exposure so a single decision can't risk a large slice of the stack. This
+// is a percentage-of-bankroll cap rather than a flat chip amount, so it stays
+// grounded in the same statistics driving the rest of the bet (it naturally
+// scales with stack size instead of hardcoding a blind count).
+const MAX_BANKROLL_FRACTION = 0.08
 
 export interface KellyRecommendation {
   rawKelly: number
