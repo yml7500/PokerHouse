@@ -78,29 +78,28 @@ export function getChenScore(holeCards: Card[]): number {
 }
 
 /**
- * Base minimum Chen scores by archetype:
- * - rock (Tight-Passive): Chen >= 7.0 (~top 15% hands: pairs, AK, AQ, broadways)
- * - shark (Tight-Aggressive): Chen >= 6.0 (~top 22% hands: pairs, broadways, suited aces, suited connectors)
- * - aggressor (Loose-Aggressive): Chen >= 4.5 (~top 35% hands: wide suited cards, connectors, pairs)
- * - caller (Loose-Passive): Chen >= 4.0 (~top 42% hands: loose calls, but folds offsuit trash like 72o, 83o)
+ * Minimum Chen scores by archetype. Loosened from the original tighter
+ * baseline (rock 7.0, shark 6.0, aggressor 4.5, caller 4.0) across all modes
+ * to favor livelier preflop action: tight archetypes loosened the most (they
+ * were folding around the most often), loose archetypes loosened a bit
+ * further too.
+ * - rock (Tight-Passive): Chen >= 5.0
+ * - shark (Tight-Aggressive): Chen >= 4.5
+ * - aggressor (Loose-Aggressive): Chen >= 3.5
+ * - caller (Loose-Passive): Chen >= 3.0
  */
 export const MIN_CHEN_SCORES: Record<PersonalityId, number> = {
-  rock: 7.0,
-  shark: 6.0,
-  aggressor: 4.5,
-  caller: 4.0,
+  rock: 5.0,
+  shark: 4.5,
+  aggressor: 3.5,
+  caller: 3.0,
 }
 
 /**
  * Checks whether a 2-card hand is playable preflop according to the archetype and bet size.
  * If callAmt is 0 (e.g. Big Blind option or free check), any hand is playable.
  */
-export function isPlayablePreflop(
-  holeCards: Card[],
-  personality: PersonalityId,
-  callAmt: number,
-  bigBlind: number,
-): boolean {
+export function isPlayablePreflop(holeCards: Card[], personality: PersonalityId, callAmt: number, bigBlind: number): boolean {
   if (!ENABLE_HUMAN_RANGE_FILTERING) return true
   if (callAmt <= 0) return true
 

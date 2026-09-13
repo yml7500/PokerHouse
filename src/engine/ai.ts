@@ -24,11 +24,18 @@ export interface AIDecision {
   reasoning: string
 }
 
+// How much worse than pot-odds-required equity each archetype will still
+// call with. The original table (rock 0.08, caller -0.08, aggressor 0.01,
+// shark 0.04) had Caller — the loose-passive "calling station" archetype —
+// as the *tightest* at this gate, which fought against its own personality
+// and was a big source of folding. Reordered so Caller is loosest (continues
+// with the worst relative equity) and Rock is tightest (a nit actually folds
+// when the math says fold), and bumped up overall so bots stay in pots more.
 const FOLD_MARGIN: Record<PersonalityId, number> = {
-  rock: 0.08,
-  caller: -0.08,
-  aggressor: 0.01,
-  shark: 0.04,
+  caller: 0.32,
+  aggressor: 0.22,
+  shark: 0.16,
+  rock: 0.1,
 }
 
 const RAISE_PROFILE: Record<PersonalityId, { minEdge: number; chance: number; potFraction: number; bluffChance: number }> = {
@@ -37,6 +44,12 @@ const RAISE_PROFILE: Record<PersonalityId, { minEdge: number; chance: number; po
   aggressor: { minEdge: 0.08, chance: 0.32, potFraction: 0.55, bluffChance: 0.08 },
   shark: { minEdge: 0.13, chance: 0.35, potFraction: 0.55, bluffChance: 0.05 },
 }
+
+// Raising after having checked earlier the same street (a true check-raise)
+// is a deliberate, situational trap play in real poker, not something that
+// should fire at the same rate as a normal bet/raise. Dampen the raise
+// chance specifically in that spot so bots don't check-raise constantly.
+const CHECK_RAISE_CHANCE_MULTIPLIER = 0.35
 
 function jitter(spread = 0.05): number {
   return (Math.random() * 2 - 1) * spread
@@ -74,7 +87,9 @@ export function decideAIAction(player: PlayerState, ctx: AIDecisionContext): AID
   const hasCards = player.holeCards && player.holeCards.length >= 2 && board.length >= 3
   const solved = hasCards ? evaluateHand([...player.holeCards, ...board]) : null
   const draws = hasCards ? detectDraws(player.holeCards, board) : { hasFlushDraw: false, hasStraightDraw: false }
-  const hasMadeHand = solved ? solved.rank >= 1 : ctx.equity >= 0.35
+  // pokersolver ranks High Card itself as 1, so >= 1 would count as "made"
+  // even with zero pair — require at least a Pair (rank 2) to count.
+  const hasMadeHand = solved ? solved.rank >= 2 : ctx.equity >= 0.35
   const hasDraw = draws.hasFlushDraw || draws.hasStraightDraw
   const hasGenuineStrength = hasMadeHand || hasDraw || ctx.equity >= 0.38
 
@@ -88,11 +103,15 @@ export function decideAIAction(player: PlayerState, ctx: AIDecisionContext): AID
       ? isPlayablePreflop(player.holeCards, personalityId, ctx.bigBlind, ctx.bigBlind)
       : hasGenuineStrength
 
+  // A check-raise is facing a bet now after having checked earlier this same street.
+  const isCheckRaiseSpot = player.lastAction === 'check' && ctx.callAmt > 0
+  const raiseChance = isCheckRaiseSpot ? raiseProfile.chance * CHECK_RAISE_CHANCE_MULTIPLIER : raiseProfile.chance
+
   const wantsValueRaise =
     isEligibleForValueRaise &&
     player.stack > 0 &&
     (equitySurplus + jitter() > raiseProfile.minEdge || ctx.equity > 0.78) &&
-    Math.random() < raiseProfile.chance
+    Math.random() < raiseChance
 
   if ((wantsValueRaise || wantsBluff) && player.stack > ctx.callAmt) {
     let betSizeFraction = wantsBluff ? Math.min(raiseProfile.potFraction, 0.4) : raiseProfile.potFraction

@@ -116,32 +116,58 @@ export function evaluateDecision(mode: GameMode, snapshot: DecisionSnapshot): Ac
     }
   }
 
-  // Easy mode (Beginner):
-  if (snapshot.callAmount === 0 && snapshot.action === 'fold') {
+  // Easy mode (Beginner): graded against the same equity-vs-pot-odds math as
+  // Proficient mode, just explained in plain language. This used to mark
+  // almost any action as "correct" (every fold, every check, every bet), which
+  // taught beginners nothing — a coach that agrees with everything isn't a coach.
+  if (snapshot.callAmount === 0) {
+    if (snapshot.action === 'fold') {
+      return {
+        isCorrect: false,
+        badgeText: '✕ Suboptimal Decision',
+        summary: 'You could have checked for free at $0 instead of folding.',
+      }
+    }
+    return {
+      isCorrect: true,
+      badgeText: '✓ Correct Decision',
+      summary:
+        snapshot.action === 'check'
+          ? 'Good check! Seeing more cards for free preserves your chips.'
+          : 'Active play! Betting here builds the pot with nothing to lose by checking.',
+    }
+  }
+
+  const hasPositiveOdds = snapshot.estimatedEquity >= snapshot.requiredEquity
+  if (!hasPositiveOdds) {
+    if (snapshot.action === 'fold') {
+      return {
+        isCorrect: true,
+        badgeText: '✓ Correct Decision',
+        summary: 'Disciplined fold! Your hand wasn\'t strong enough to justify the cost of continuing.',
+      }
+    }
     return {
       isCorrect: false,
       badgeText: '✕ Suboptimal Decision',
-      summary: 'You could have checked for free at $0 instead of folding.',
+      summary: `Your hand wasn't strong enough for this price — ${snapshot.action === 'call' ? 'calling' : 'putting in more chips'} here loses value over time. Folding would have protected your chips.`,
     }
   }
+
   if (snapshot.action === 'fold') {
     return {
-      isCorrect: true,
-      badgeText: '✓ Correct Decision',
-      summary: 'Disciplined fold! Folding protects your chips when facing bets.',
-    }
-  }
-  if (snapshot.action === 'check') {
-    return {
-      isCorrect: true,
-      badgeText: '✓ Correct Decision',
-      summary: 'Good check! Seeing more cards for free preserves your chips.',
+      isCorrect: false,
+      badgeText: '✕ Suboptimal Decision',
+      summary: 'Your hand was actually strong enough to continue here — folding gave up value.',
     }
   }
   return {
     isCorrect: true,
     badgeText: '✓ Correct Decision',
-    summary: 'Active play! Putting chips in the pot to challenge opponents.',
+    summary:
+      snapshot.action === 'call'
+        ? 'Good call! Your hand was strong enough to be worth the price.'
+        : 'Active play! Betting a hand this strong builds the pot in your favor.',
   }
 }
 
@@ -154,14 +180,16 @@ export function easyModeExplanation(snapshot: DecisionSnapshot, heroCards: Card[
   parts.push(`${evalResult.badgeText}!`)
 
   if (snapshot.action === 'fold') {
-    parts.push(`You folded${strengthPhrase ? ` with ${strengthPhrase} (${snapshot.handDescription})` : ''}. Folding weak hands protects your chips.`)
+    parts.push(`You folded${strengthPhrase ? ` with ${strengthPhrase} (${snapshot.handDescription})` : ''}.`)
   } else if (snapshot.action === 'check') {
-    parts.push(`You checked${strengthPhrase ? ` with ${strengthPhrase}` : ''}, keeping the pot small while you see more cards for free.`)
+    parts.push(`You checked${strengthPhrase ? ` with ${strengthPhrase}` : ''}.`)
   } else if (snapshot.action === 'call') {
     parts.push(`You called with ${strengthPhrase ?? 'your hand'}${snapshot.handDescription ? ` (${snapshot.handDescription})` : ''}.`)
   } else {
-    parts.push(`You ${snapshot.action === 'raise' ? 'raised' : snapshot.action === 'bet' ? 'bet' : 'went all-in'} with ${strengthPhrase ?? 'your hand'}${snapshot.handDescription ? ` (${snapshot.handDescription})` : ''}. Betting strong hands builds the pot.`)
+    parts.push(`You ${snapshot.action === 'raise' ? 'raised' : snapshot.action === 'bet' ? 'bet' : 'went all-in'} with ${strengthPhrase ?? 'your hand'}${snapshot.handDescription ? ` (${snapshot.handDescription})` : ''}.`)
   }
+
+  parts.push(evalResult.summary)
 
   if (draws.hasFlushDraw) parts.push("You're holding a flush draw — you have potential to improve on later streets.")
   if (draws.hasStraightDraw) parts.push("You're holding a straight draw — a few more cards could complete a strong hand.")
