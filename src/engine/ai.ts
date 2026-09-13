@@ -114,17 +114,23 @@ export function decideAIAction(player: PlayerState, ctx: AIDecisionContext): AID
     Math.random() < raiseChance
 
   if ((wantsValueRaise || wantsBluff) && player.stack > ctx.callAmt) {
-    let betSizeFraction = wantsBluff ? Math.min(raiseProfile.potFraction, 0.4) : raiseProfile.potFraction
-
-    if (ctx.mode === 'hard') {
-      const b = netOddsForCall(ctx.pot, Math.max(ctx.callAmt, ctx.bigBlind))
-      const bankroll = player.stack + player.currentBet
-      const kelly = recommendedKelly(ctx.equity, Math.max(b, 1), bankroll, personality.kellyMultiplier)
-      betSizeFraction = Math.max(betSizeFraction, Math.min(0.8, kelly.recommendedFraction * 3))
-    }
+    const betSizeFraction = wantsBluff ? Math.min(raiseProfile.potFraction, 0.4) : raiseProfile.potFraction
 
     const potAfterCall = ctx.pot + ctx.callAmt
-    const raiseAmountOnTop = Math.max(ctx.minRaise, Math.round(potAfterCall * betSizeFraction))
+    let raiseAmountOnTop = Math.max(ctx.minRaise, Math.round(potAfterCall * betSizeFraction))
+
+    // Kelly-derived hard cap on aggression, applied in every mode (previously
+    // only 'hard' mode used Kelly at all, and even then it multiplied the
+    // recommendation by 3x to *boost* sizing, which defeated the point of a
+    // cap and let stacks bleed out in just a few hands). This bounds how much
+    // any archetype — especially Aggressor, whose kellyMultiplier is full
+    // Kelly (1.0) — can commit on a single bet/raise, so a stack survives at
+    // least 10-15 hands of normal variance.
+    const bankroll = player.stack + player.currentBet
+    const netOdds = netOddsForCall(ctx.pot, Math.max(ctx.callAmt, ctx.bigBlind))
+    const kelly = recommendedKelly(ctx.equity, Math.max(netOdds, 1), bankroll, personality.kellyMultiplier)
+    const kellyHardCap = Math.max(kelly.recommendedAmount, ctx.minRaise)
+    raiseAmountOnTop = Math.min(raiseAmountOnTop, kellyHardCap)
     const targetTotalBet = ctx.currentBet + raiseAmountOnTop
     const finalTotal = clampToRaise(targetTotalBet, ctx.currentBet, ctx.minRaise, player.stack, player.currentBet)
     const amount = finalTotal - player.currentBet

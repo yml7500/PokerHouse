@@ -22,7 +22,10 @@ export function netOddsForCall(potBeforeCall: number, callAmount: number): numbe
   return potBeforeCall / callAmount
 }
 
-const MAX_BANKROLL_FRACTION = 0.25
+// Lowered from 0.25 -> tighter hard cap on recommended bankroll exposure so
+// a single decision can't risk a large slice of the stack, keeping bust-outs
+// (human or bot) from happening in just a handful of hands.
+const MAX_BANKROLL_FRACTION = 0.12
 
 export interface KellyRecommendation {
   rawKelly: number
