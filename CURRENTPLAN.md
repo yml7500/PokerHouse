@@ -1,7 +1,7 @@
 # PokerHouse — Comprehensive Handoff & Architecture Plan
 
 **Status: Production Ready & Fully Playable End-to-End MVP.**
-- **Test Suite**: **67 / 67 tests passing** across 10 test suites via Vitest (`npm test`).
+- **Test Suite**: **78 / 78 tests passing** across 11 test suites via Vitest (`npm test`).
 - **Production Build**: Clean compilation with `tsc -b && vite build` (zero errors, `dist/` bundle created).
 - **Linter**: Clean with zero errors via `oxlint`.
 - **Dev Server**: Running live on `http://localhost:5173/` (`npm run dev`).
@@ -94,6 +94,7 @@ Located in [`src/engine/ai.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/
 | [`potOdds.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/potOdds.ts) | Mathematical calculation of required equity based on pot odds ($Call / (Pot + Call)$). | [`potOdds.test.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/__tests__/potOdds.test.ts) (3 tests) |
 | [`kelly.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/kelly.ts) | Kelly Criterion implementation: $f^* = (b \cdot p - q) / b$, preserving negative edge for coaching. | [`kelly.test.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/__tests__/kelly.test.ts) (8 tests) |
 | [`education.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/education.ts) | Post-action evaluation and dynamic feedback generation for Beginner, Proficient, and Advanced modes. | [`education.test.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/__tests__/education.test.ts) (14 tests) |
+| [`simulator.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/simulator.ts) | High-throughput engine simulator (~3,000 hands/sec) for bot calibration, parameter testing, and statistical profiling (VPIP, PFR, AF, BB/100, WTSD, W$SD). | [`simulator.test.ts`](file:///Users/yumingliu/Projects/PokerHouse/src/engine/__tests__/simulator.test.ts) (11 tests) |
 
 ### UI Layer (`src/components/`, `src/state/`)
 | Component | Responsibility |

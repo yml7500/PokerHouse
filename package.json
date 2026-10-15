@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "simulate": "jiti ./src/engine/runSimulation.ts"
   },
   "dependencies": {
     "pokersolver": "^2.1.4",

@@ -1,6 +1,10 @@
-import { Hand } from 'pokersolver'
+import * as pokersolverModule from 'pokersolver'
 import type { Card } from '../types'
 import { buildDeck, cardToString } from './deck'
+
+// Handle CJS/ESM interop across Vite, Vitest, Node, and Jiti
+const mod = (pokersolverModule as any).default ?? pokersolverModule
+const Hand = mod.Hand ?? mod['module.exports']?.Hand ?? pokersolverModule.Hand
 
 function removeCards(deck: Card[], used: Card[]): Card[] {
   const usedKeys = new Set(used.map(cardToString))
@@ -23,7 +27,7 @@ export function estimateEquity(
   heroCards: Card[],
   communityCards: Card[],
   numOpponents: number,
-  iterations = 300,
+  iterations = 10000,
 ): number {
   if (numOpponents <= 0) return 1
   const known = [...heroCards, ...communityCards]

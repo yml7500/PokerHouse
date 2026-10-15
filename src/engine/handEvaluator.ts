@@ -1,12 +1,17 @@
-import { Hand } from 'pokersolver'
+import type { Hand as HandType } from 'pokersolver'
+import * as pokersolverModule from 'pokersolver'
 import type { Card } from '../types'
 import { cardToString } from './deck'
+
+// Handle CJS/ESM interop across Vite, Vitest, Node, and Jiti
+const mod = (pokersolverModule as any).default ?? pokersolverModule
+const Hand = mod.Hand ?? mod['module.exports']?.Hand ?? pokersolverModule.Hand
 
 export interface EvaluatedHand {
   name: string
   descr: string
   rank: number
-  solverHand: Hand
+  solverHand: HandType
 }
 
 export function evaluateHand(cards: Card[]): EvaluatedHand {
