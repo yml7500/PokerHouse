@@ -31,31 +31,31 @@ export interface AIDecision {
 // and was a big source of folding. Reordered so Caller is loosest (continues
 // with the worst relative equity) and Rock is tightest (a nit actually folds
 // when the math says fold), and bumped up overall so bots stay in pots more.
-const FOLD_MARGIN: Record<PersonalityId, number> = {
-  caller: 0.32,
-  aggressor: 0.22,
-  shark: 0.16,
-  rock: 0.1,
+const BASE_FOLD_MARGIN: Record<PersonalityId, number> = {
+  caller: 0.14,
+  aggressor: 0.08,
+  shark: 0.04,
+  rock: 0.00,
 }
 
 // Middle ground between the original table (too much checking around:
 // minEdge 0.2/0.18/0.08/0.13, chance 0.22/0.18/0.32/0.35, bluffChance
 // 0.02/0.02/0.08/0.05) and an earlier over-correction that raised chance and
-// potFraction too far and made bots bet/raise "haywire". Frequency is nudged
+// potFraction too far and made bots bet/raise haywire. Frequency is nudged
 // up from the original; sizing is reined in by the Kelly hard cap below
 // rather than by shrinking potFraction.
 const RAISE_PROFILE: Record<PersonalityId, { minEdge: number; chance: number; potFraction: number; bluffChance: number }> = {
-  rock: { minEdge: 0.17, chance: 0.28, potFraction: 0.46, bluffChance: 0.03 },
-  caller: { minEdge: 0.15, chance: 0.24, potFraction: 0.46, bluffChance: 0.03 },
-  aggressor: { minEdge: 0.06, chance: 0.4, potFraction: 0.55, bluffChance: 0.11 },
-  shark: { minEdge: 0.1, chance: 0.42, potFraction: 0.55, bluffChance: 0.08 },
+  rock: { minEdge: 0.18, chance: 0.25, potFraction: 0.33, bluffChance: 0.03 },
+  caller: { minEdge: 0.13, chance: 0.24, potFraction: 0.33, bluffChance: 0.03 },
+  aggressor: { minEdge: 0.09, chance: 0.4, potFraction: 0.5, bluffChance: 0.09 },
+  shark: { minEdge: 0.1, chance: 0.32, potFraction: 0.45, bluffChance: 0.08 },
 }
 
 // Raising after having checked earlier the same street (a true check-raise)
 // is a deliberate, situational trap play in real poker, not something that
 // should fire at the same rate as a normal bet/raise. Dampen the raise
 // chance specifically in that spot so bots don't check-raise constantly.
-const CHECK_RAISE_CHANCE_MULTIPLIER = 0.35
+const CHECK_RAISE_CHANCE_MULTIPLIER = 0.23
 
 function jitter(spread = 0.05): number {
   return (Math.random() * 2 - 1) * spread
@@ -70,7 +70,8 @@ function clampToRaise(targetTotalBet: number, currentBet: number, minRaise: numb
 export function decideAIAction(player: PlayerState, ctx: AIDecisionContext): AIDecision {
   const personalityId = player.personality ?? 'caller'
   const personality = PERSONALITIES[personalityId]
-  const foldMargin = FOLD_MARGIN[personalityId]
+  const streetFactor = ctx.street === 'flop' ? 1.0 : ctx.street === 'turn' ? 0.6 : 0.2
+  const foldMargin = BASE_FOLD_MARGIN[personalityId] * streetFactor
   const raiseProfile = RAISE_PROFILE[personalityId]
 
   const canCheck = ctx.callAmt === 0
@@ -93,10 +94,15 @@ export function decideAIAction(player: PlayerState, ctx: AIDecisionContext): AID
   const hasCards = player.holeCards && player.holeCards.length >= 2 && board.length >= 3
   const solved = hasCards ? evaluateHand([...player.holeCards, ...board]) : null
   const draws = hasCards ? detectDraws(player.holeCards, board) : { hasFlushDraw: false, hasStraightDraw: false }
-  // pokersolver ranks High Card itself as 1, so >= 1 would count as "made"
-  // even with zero pair — require at least a Pair (rank 2) to count.
-  const hasMadeHand = solved ? solved.rank >= 2 : ctx.equity >= 0.35
-  const hasDraw = draws.hasFlushDraw || draws.hasStraightDraw
+
+  const boardRanks = new Set(board.map((c) => c.rank))
+  const isPocketPair = player.holeCards.length >= 2 && player.holeCards[0].rank === player.holeCards[1].rank
+  const pairsBoard = player.holeCards.some((c) => boardRanks.has(c.rank))
+  const heroContributed = isPocketPair || pairsBoard || (solved ? solved.rank >= 3 : false)
+
+  // Require actual hero pair or better, not just playing a paired board
+  const hasMadeHand = solved ? (solved.rank >= 2 && heroContributed) : ctx.equity >= 0.35
+  const hasDraw = ctx.street !== 'river' && (draws.hasFlushDraw || draws.hasStraightDraw)
   const hasGenuineStrength = hasMadeHand || hasDraw || ctx.equity >= 0.38
 
   // Bluff: occasionally bet/raise with a weak hand when checked to, mostly the Aggressor.

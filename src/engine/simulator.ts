@@ -142,25 +142,34 @@ export function fastEstimateEquity(
   const solved = evaluateHand(allCards)
   const draws = detectDraws(holeCards, communityCards)
 
+  const boardRanks = new Set(communityCards.map((c) => c.rank))
+  const isPocketPair = holeCards.length >= 2 && holeCards[0].rank === holeCards[1].rank
+  const pairsBoard = holeCards.some((c) => boardRanks.has(c.rank))
+  const heroContributedPair = isPocketPair || pairsBoard
+
   let baseStrength = 0.18
   switch (solved.rank) {
     case 1: // High Card
       baseStrength = 0.18
       break
     case 2: // One Pair
-      baseStrength = 0.48
+      if (!heroContributedPair) {
+        baseStrength = 0.18 // Paired board, hero holds unimproved high card
+      } else {
+        baseStrength = communityCards.length === 3 ? 0.46 : communityCards.length === 4 ? 0.36 : 0.28
+      }
       break
     case 3: // Two Pair
-      baseStrength = 0.72
+      baseStrength = communityCards.length <= 4 ? 0.70 : 0.60
       break
     case 4: // Three of a Kind
-      baseStrength = 0.84
+      baseStrength = 0.82
       break
     case 5: // Straight
-      baseStrength = 0.91
+      baseStrength = 0.90
       break
     case 6: // Flush
-      baseStrength = 0.94
+      baseStrength = 0.93
       break
     case 7: // Full House
       baseStrength = 0.97

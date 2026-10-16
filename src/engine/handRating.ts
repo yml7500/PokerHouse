@@ -89,7 +89,7 @@ export function getChenScore(holeCards: Card[]): number {
  * - caller (Loose-Passive): Chen >= 3.0
  */
 export const MIN_CHEN_SCORES: Record<PersonalityId, number> = {
-  rock: 5.0,
+  rock: 5.5,
   shark: 4.5,
   aggressor: 3.5,
   caller: 3.0,

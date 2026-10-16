@@ -5,25 +5,25 @@ export const PERSONALITIES: Record<PersonalityId, Personality> = {
     id: 'rock',
     name: 'The Rock',
     description: 'Very tight. Folds weak hands, calls reasonable bets, raises with strong hands.',
-    kellyMultiplier: 0.25,
+    kellyMultiplier: 0.15,
   },
   caller: {
     id: 'caller',
     name: 'The Caller',
     description: 'Loose and passive. Calls often, rarely folds to small bets, raises with strong hands.',
-    kellyMultiplier: 0.5,
+    kellyMultiplier: 0.35,
   },
   aggressor: {
     id: 'aggressor',
     name: 'The Aggressor',
     description: 'Bets and raises often, takes bigger risks, sometimes bluffs.',
-    kellyMultiplier: 1.0,
+    kellyMultiplier: 0.5,
   },
   shark: {
     id: 'shark',
     name: 'The Shark',
     description: 'Uses equity and pot odds intelligently. Selective aggression.',
-    kellyMultiplier: 0.5,
+    kellyMultiplier: 0.3,
   },
 }
 

@@ -27,7 +27,7 @@ export function estimateEquity(
   heroCards: Card[],
   communityCards: Card[],
   numOpponents: number,
-  iterations = 10000,
+  iterations = 2000,
 ): number {
   if (numOpponents <= 0) return 1
   const known = [...heroCards, ...communityCards]

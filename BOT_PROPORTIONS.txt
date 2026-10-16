@@ -1,0 +1,262 @@
+================================================================================
+POKERHOUSE AI ENGINE — PROPORTIONS, PARAMETERS & DECISION ARCHITECTURE
+================================================================================
+
+This document provides a complete reference for all mathematical variables,
+probabilities, proportions, thresholds, and formulas driving bot decision-making
+in the PokerHouse engine.
+
+
+================================================================================
+1. IRRATIONALITY CALIBRATIONS (TOOK A WHILE)
+================================================================================
+
+Dimension                  The Rock         The Caller       The Aggressor    The Shark
+--------------------------------------------------------------------------------
+Archetype ID               rock             caller           aggressor        shark
+Style                      Tight-Passive    Loose-Passive    Loose-Aggressive Tight-Aggressive
+Poker Nickname             Nit              Calling Station  LAG              TAG
+
+Base Fold Margin           0.00 (0%)        0.14 (14%)       0.08 (8%)        0.04 (4%)
+Min Preflop Chen Score     5.5              3.0              3.5              4.5
+Min Equity Edge (minEdge)  0.18 (18%)       0.13 (13%)       0.09 (9%)        0.10 (10%)
+Raise Frequency (chance)   0.25 (25%)       0.24 (24%)       0.40 (40%)       0.32 (32%)
+Target Sizing (potFraction)0.33 (33% pot)   0.33 (33% pot)   0.50 (50% pot)   0.45 (45% pot)
+Bluff Frequency            0.03 (3%)        0.03 (3%)        0.09 (9%)        0.08 (8%)
+Kelly Multiplier           0.15 (15% Kelly) 0.35 (35% Kelly) 0.50 (50% Kelly) 0.30 (30% Kelly)
+
+
+================================================================================
+CALLING & FOLD TOLERANCE PARAMETERS
+================================================================================
+Location: src/engine/ai.ts
+
+A. BASE_FOLD_MARGIN
+   - Values:
+       caller:    0.14
+       aggressor: 0.08
+       shark:     0.04
+       rock:      0.00
+   - Definition:
+       How much worse than pot-odds-required equity a player is willing to
+       continue/call with on the flop. Measures "bad-call tolerance" or
+       willingness to float speculative holdings.
+   - Formula:
+       threshold = requiredEquity - foldMargin
+       willCall  = (equity + jitter() + 0.001) >= threshold
+
+       A positive margin lowers the bar needed to call. For example, facing a
+       half-pot bet (requiredEquity = 25%):
+         * Caller requires only >= 11% equity
+         * Aggressor requires >= 17% equity
+         * Shark requires >= 21% equity
+         * Rock strictly requires >= 25% equity
+
+B. streetFactor (Dynamic Decay Across Streets)
+   - Formula:
+       streetFactor = flop: 1.0 | turn: 0.6 | river: 0.2
+       foldMargin   = BASE_FOLD_MARGIN[personalityId] * streetFactor
+   - Function:
+       Reflects poker mathematics: implied odds exist on the flop, shrink on the
+       turn (1 card left to come), and vanish on the river (no more cards left).
+       On the river, all bots must have close to true mathematical pot odds.
+   - Effective Margins Across Streets:
+       Flop:  Caller +14.0% | Aggressor +8.0% | Shark +4.0% | Rock 0.0%
+       Turn:  Caller  +8.4% | Aggressor +4.8% | Shark +2.4% | Rock 0.0%
+       River: Caller  +2.8% | Aggressor +1.6% | Shark +0.8% | Rock 0.0%
+
+
+================================================================================
+3. BETTING, RAISING & BLUFFING PARAMETERS
+================================================================================
+Location: src/engine/ai.ts
+
+A. minEdge
+   - Values: rock: 0.18 | caller: 0.13 | aggressor: 0.09 | shark: 0.10
+   - Definition:
+       The minimum equity surplus over pot odds (equitySurplus = equity - requiredEquity)
+       required before a bot is eligible to bet or raise for value.
+   - Function:
+       High values (Rock: 18%) require large statistical edges. Low values
+       (Aggressor: 9%) allow attacking with thin advantages.
+
+B. chance
+   - Values: rock: 0.25 | caller: 0.24 | aggressor: 0.40 | shark: 0.32
+   - Definition:
+       The probability that an eligible bot will pull the trigger on a value
+       bet or raise rather than checking or flat-calling (pot control/trapping).
+
+C. CHECK_RAISE_CHANCE_MULTIPLIER
+   - Value: 0.23 (23%)
+   - Definition:
+       A multiplier applied to `chance` when facing a check-raise opportunity:
+       (player.lastAction === 'check' && callAmt > 0).
+   - Function:
+       Check-raising is a situational trap in real poker; dampening by 0.23
+       prevents bots from check-raising uncontrollably.
+
+D. potFraction
+   - Values: rock: 0.33 | caller: 0.33 | aggressor: 0.50 | shark: 0.45
+   - Definition:
+       The target bet/raise sizing as a proportion of total pot after calling:
+         potAfterCall = pot + callAmt
+         raiseAmountOnTop = max(minRaise, round(potAfterCall * potFraction))
+
+E. bluffChance
+   - Values: rock: 0.03 | caller: 0.03 | aggressor: 0.09 | shark: 0.08
+   - Definition:
+       The probability of firing a bluff bet when checked to (canCheck === true)
+       with weak holdings (equity < 0.40).
+   - Safeguards:
+       1. Bluff size is capped at <= 40% pot: min(raiseProfile.potFraction, 0.4)
+       2. Bluffs are strictly forbidden from pushing all-in.
+
+
+================================================================================
+4. PREFLOP HAND SELECTION (BILL CHEN FORMULA)
+================================================================================
+Location: src/engine/handRating.ts
+
+A. MIN_CHEN_SCORES
+   - Values: rock: 5.5 | shark: 4.5 | aggressor: 3.5 | caller: 3.0
+   - Definition:
+       Minimum Bill Chen score (0 to 20) required to enter a pot preflop facing
+       a bet or blind.
+
+B. Bill Chen Scoring Rules:
+   1. High Card Score:
+        Ace = 10, King = 8, Queen = 7, Jack = 6, 10 = 5
+        9 through 2 = rank / 2 (e.g. 9 -> 4.5, 7 -> 3.5, 2 -> 1.0)
+   2. Pocket Pairs:
+        Double the high card score, minimum pair score floor is 5.
+        (e.g. 22 = 5, 88 = 8, TT = 10, AA = 20)
+   3. Suited Cards:
+        Add +2.0 points if cards share the same suit.
+   4. Gaps / Closeness:
+        0 gap (connected, e.g. J-T) = 0
+        1-card gap (e.g. J-9)        = -1.0
+        2-card gap (e.g. J-8)        = -2.0
+        3-card gap (e.g. J-7)        = -4.0
+        4+ card gap                  = -5.0
+   5. Straight Bonus:
+        +1.0 point if gap <= 1 and highest card is less than Queen.
+
+C. Preflop Raise Sizing Penalty:
+   When facing a raise above 1 Big Blind (callAmt > bigBlind):
+     raisesAboveBB = max(0, (callAmt - bigBlind) / bigBlind)
+     requiredChen  = baseThreshold + (raisesAboveBB * 1.0)
+
+
+================================================================================
+5. BANKROLL & BET SIZING MECHANICS (KELLY CRITERION)
+================================================================================
+Location: src/engine/kelly.ts & src/engine/ai.ts
+
+A. Raw Kelly Equation:
+     f* = p - (q / b) = (b * p - q) / b
+     where:
+       p = win probability / equity in [0, 1]
+       q = 1 - p (loss probability)
+       b = net odds = potBeforeCall / callAmount
+
+B. MAX_BANKROLL_FRACTION
+   - Value: 0.08 (8% of bankroll)
+   - Function:
+       Absolute hard cap on stack commitment on any single decision,
+       preventing stack burnout within a handful of hands.
+
+C. kellyMultiplier
+   - Values: aggressor: 0.50 | caller: 0.35 | shark: 0.30 | rock: 0.15
+   - Function:
+       Scales the raw Kelly fraction down to conservative fractional Kelly:
+         recommendedFraction = min(max(0, f*) * kellyMultiplier, 0.08)
+         kellyHardCap        = max(minRaise, round(recommendedFraction * bankroll))
+         raiseAmountOnTop    = min(raiseAmountOnTop, kellyHardCap)
+
+
+================================================================================
+6. DECISION JITTER & RANDOM NOISE
+================================================================================
+Location: src/engine/ai.ts
+
+A. jitter(spread = 0.05)
+   - Formula: (Math.random() * 2 - 1) * spread
+   - Definition: Continuous uniform random noise in [-0.05, +0.05].
+   - Function:
+       Injected into equity comparisons (equity + jitter()) so bots do not
+       act as rigid, perfectly predictable computers.
+
+
+================================================================================
+7. HAND STRENGTH & BOARD PAIR DISQUALIFICATION GATES
+================================================================================
+Location: src/engine/ai.ts
+
+A. Board Pair Disqualification (heroContributed):
+   - Logic:
+       isPocketPair = holeCards[0].rank === holeCards[1].rank
+       pairsBoard   = holeCards.some(c => boardRanks.has(c.rank))
+       heroContributed = isPocketPair || pairsBoard || (solved.rank >= 3)
+   - Function:
+       Prevents bots from assuming they hold a made hand when the board itself
+       has a pair (e.g. board 8-8-K with 3-4 in hand).
+
+B. River Dead-Draw Suppression:
+   - Logic: hasDraw = (street !== 'river') && (draws.flush || draws.straight)
+   - Function:
+       Draw bonuses are deactivated on the river because all 5 cards are dealt.
+
+C. Action Thresholds:
+   - equity > 0.78: Triggers value raise eligibility regardless of pot odds.
+   - equity > 0.82: Monster hand threshold; permits all-in shoves.
+   - stack <= bigBlind * 4: Critically short stack; allows all-in shove.
+   - stack * 0.45: Stack cap on non-monster raises to allow multi-street play.
+   - equity < 0.30 and !hasGenuineStrength: Postflop air fold gate.
+
+
+================================================================================
+8. ANALYTICAL EQUITY MODEL (fastEstimateEquity)
+================================================================================
+Location: src/engine/simulator.ts (Used by high-throughput calibration engine)
+
+A. Preflop Formula:
+     headsUpEquity = 0.32 + max(0, chen) * 0.0265
+     multiway      = headsUpEquity ^ (1 + (numOpponents - 1) * 0.35)
+     clamped to: [0.06, 0.92]
+
+B. Postflop Made Hand Base Strengths:
+     High Card:         0.18
+     One Pair:
+       Flop (3 cards):  0.46
+       Turn (4 cards):  0.36
+       River (5 cards): 0.28 (degrades naturally across streets)
+       Unassisted Board:0.18 (treated as High Card)
+     Two Pair:          Flop/Turn 0.70 | River 0.60
+     Three of a Kind:   0.82
+     Straight:          0.90
+     Flush:             0.93
+     Full House:        0.97
+     Quads / St. Flush: 0.99
+
+C. Draw Bonus (Rule of 2 & 4) (when communityCards.length < 5):
+     multiplier = flop ? 0.04 : 0.02
+     Flush Draw (9 outs):    +9 * multiplier (+36% on flop, +18% on turn)
+     Straight Draw (8 outs): +8 * multiplier (+32% on flop, +16% on turn)
+
+D. Multiway Discounting:
+     equity = baseStrength / (1 + (numOpponents - 1) * 0.42)
+     clamped to: [0.04, 0.98]
+
+
+================================================================================
+9. GLOBAL TABLE & ECONOMY CONSTANTS
+================================================================================
+Location: src/engine/gameEngine.ts
+
+- Small Blind: $10
+- Big Blind:   $20
+- Starting Stack: $2,000 (100 Big Blinds)
+- Total Seats: 5 (1 Human, 4 Bots)
+- Total Chips Conserved on Table: $10,000
+- Monte Carlo Iterations in Live Gameplay: 2,000 (src/engine/equity.ts)
+================================================================================
