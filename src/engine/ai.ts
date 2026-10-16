@@ -32,9 +32,9 @@ export interface AIDecision {
 // with the worst relative equity) and Rock is tightest (a nit actually folds
 // when the math says fold), and bumped up overall so bots stay in pots more.
 const BASE_FOLD_MARGIN: Record<PersonalityId, number> = {
-  caller: 0.14,
-  aggressor: 0.08,
-  shark: 0.04,
+  caller: 0.1,
+  aggressor: 0.06,
+  shark: 0.03,
   rock: 0.00,
 }
 
@@ -55,7 +55,7 @@ const RAISE_PROFILE: Record<PersonalityId, { minEdge: number; chance: number; po
 // is a deliberate, situational trap play in real poker, not something that
 // should fire at the same rate as a normal bet/raise. Dampen the raise
 // chance specifically in that spot so bots don't check-raise constantly.
-const CHECK_RAISE_CHANCE_MULTIPLIER = 0.23
+const CHECK_RAISE_CHANCE_MULTIPLIER = 0.3
 
 function jitter(spread = 0.05): number {
   return (Math.random() * 2 - 1) * spread
